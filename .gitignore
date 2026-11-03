@@ -1,0 +1,15 @@
+# Local hotel application data
+hotel_data/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Editor settings
+.vscode/
+HOTEL-MANAGEMENT-SYSTEM-backup.py
+backup_final_hms_before_changes.py
