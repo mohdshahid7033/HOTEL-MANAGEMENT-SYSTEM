@@ -47,11 +47,8 @@ python ".\!!!!!!! Final HMS !!!!!!!.py"
 
 ## Project Credits
 
-**Project Owner & Developer:**  
+**Maintained by:**  
 Mohd Shahid Moinuddin
-
-**Original Co-Developer:**  
-Abaid Khan
 
 ## GitHub
 
@@ -91,11 +88,8 @@ Developed with Python and Tkinter.
 
 ## Project Credits
 
-**Project Owner & Developer:**
+**Maintained by:**
 Mohd Shahid Moinuddin
-
-**Original Co-Developer:**
-Abaid Khan
 
 ## GitHub
 

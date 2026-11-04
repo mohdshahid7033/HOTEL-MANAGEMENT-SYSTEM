@@ -305,7 +305,7 @@ class HotelApp:
         enter_button.pack(pady=30, ipadx=50, ipady=10)
         developer_label = tk.Label(
             self.current_frame,
-            text="Project Owner & Developer: Mohd Shahid Moinuddin\nOriginal Co-Developer: Abaid Khan",
+            text="Maintained by: Mohd Shahid Moinuddin",
             bg=self.BG_COLOR,
             fg=self.TEXT_COLOR,
             font=("Georgia", 12, "italic"),
