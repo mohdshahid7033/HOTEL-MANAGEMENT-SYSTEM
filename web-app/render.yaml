@@ -1,0 +1,27 @@
+# Render Blueprint Specification for Taj Banjara Hotel Management System
+# Note: Persistent disks on Render require the 'starter' plan ($7/mo) or above plus disk pricing ($0.25/GB/mo).
+# On the free tier, filesystems are ephemeral (reverts on redeployment/restart).
+
+services:
+  - type: web
+    name: taj-banjara-hotel-management
+    runtime: python
+    buildCommand: pip install -r web-app/requirements.txt
+    startCommand: gunicorn --chdir web-app --workers 1 --threads 4 app:app
+    healthCheckPath: /health
+    plan: starter
+    disk:
+      name: hotel-data-disk
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.8
+      - key: SECRET_KEY
+        generateValue: true
+      - key: INITIAL_ADMIN_PASSWORD
+        generateValue: true
+      - key: DATABASE_PATH
+        value: /var/data/hotel_web.db
+      - key: DEMO_MODE
+        value: "true"

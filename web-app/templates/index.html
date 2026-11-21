@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👑 Taj Banjara Hotel — Management System</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👑</text></svg>">
+</head>
+<body>
+  <!-- Top Global Header -->
+  <header class="app-header">
+    <div class="header-brand" id="brand-home-btn" role="button" tabindex="0">
+      <span class="brand-crown">👑</span>
+      <div>
+        <h1 class="brand-title">Taj Banjara Hotel</h1>
+        <span class="brand-tagline">Management &amp; Operations Portal</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div class="header-meta">
+        <span id="header-clock" class="header-clock">--:--:--</span>
+        <span id="user-badge" class="user-badge hidden">Logged in as: <strong id="user-badge-name">Admin</strong></span>
+      </div>
+      <button id="btn-logout" class="btn-logout hidden" title="Sign out of current session">🚪 Logout</button>
+    </div>
+  </header>
+
+  <!-- Demo Notice Banner -->
+  <aside class="demo-banner" id="demo-banner">
+    <div class="demo-banner-content">
+      <span>👑 <strong>Taj Banjara Hotel Portfolio Demonstration</strong> — Simulated hotel management system with synthetic data.</span>
+      <span class="demo-banner-tag">Portfolio Demonstration</span>
+    </div>
+  </aside>
+
+  <!-- Main View Container -->
+  <main class="main-viewport" id="viewport">
+
+    <!-- 1. Welcome View -->
+    <section id="view-welcome" class="view-panel active">
+      <div class="welcome-card">
+        <div class="welcome-crown">👑</div>
+        <h2 class="welcome-title">Welcome to Taj Banjara Hotel</h2>
+        <p class="welcome-subtitle">Luxury Hospitality Operations &amp; Guest Management</p>
+
+        <div class="welcome-actions">
+          <button id="btn-welcome-enter" class="btn-gold btn-large">Enter System</button>
+        </div>
+
+        <div class="credits-box">
+          <p class="credits-primary">Project Owner &amp; Sole Developer: <strong>Mohd Shahid Moin Uddin</strong></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. First-Time Setup View -->
+    <section id="view-setup" class="view-panel">
+      <div class="form-card">
+        <h2 class="card-title">👑 Initial Administrator Setup</h2>
+        <p class="card-subtitle">No staff accounts found. Please configure the primary administrator.</p>
+
+        <form id="setup-form" class="hms-form">
+          <div class="form-group">
+            <label for="setup-name">Administrator Name:</label>
+            <input type="text" id="setup-name" class="hms-input" placeholder="e.g. Mohd Shahid Moin Uddin" required>
+          </div>
+          <div class="form-group">
+            <label for="setup-contact">Contact Information:</label>
+            <input type="text" id="setup-contact" class="hms-input" placeholder="e.g. 9900000001" required>
+          </div>
+          <div class="form-group">
+            <label for="setup-username">Username:</label>
+            <input type="text" id="setup-username" class="hms-input" placeholder="e.g. admin" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="setup-password">Password:</label>
+            <input type="password" id="setup-password" class="hms-input" placeholder="Enter secure password" required autocomplete="new-password">
+          </div>
+          <div class="form-group">
+            <label for="setup-confirm">Confirm Password:</label>
+            <input type="password" id="setup-confirm" class="hms-input" placeholder="Re-enter password" required autocomplete="new-password">
+          </div>
+
+          <div id="setup-feedback" class="feedback-msg"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-gold btn-block">Create Administrator Account</button>
+            <button type="button" class="btn-secondary btn-block nav-back-welcome">← Back</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 3. Staff Login View -->
+    <section id="view-login" class="view-panel">
+      <div class="form-card login-card">
+        <h2 class="card-title">🔑 Staff Login</h2>
+        <p class="card-subtitle">Please authenticate to access the Taj Banjara management dashboard.</p>
+
+        <!-- Portfolio Quick-Demo Login Pill (Restricted Receptionist Access Only) -->
+        <div class="demo-quick-login">
+          <span class="quick-login-label">⚡ Portfolio Demo:</span>
+          <div class="quick-login-buttons">
+            <button type="button" id="btn-quick-staff" class="btn-pill" title="Log in as Demo Receptionist (Restricted Portfolio Access)">Demo Receptionist (Staff Access)</button>
+          </div>
+        </div>
+
+        <form id="login-form" class="hms-form">
+          <div class="form-group">
+            <label for="login-username">Username:</label>
+            <input type="text" id="login-username" class="hms-input" placeholder="Username" required autocomplete="username">
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password:</label>
+            <input type="password" id="login-password" class="hms-input" placeholder="Password" required autocomplete="current-password">
+          </div>
+
+          <div id="login-feedback" class="feedback-msg"></div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-gold btn-block">Login</button>
+            <button type="button" class="btn-secondary btn-block nav-back-welcome">← Back</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 4. Dashboard View -->
+    <section id="view-dashboard" class="view-panel">
+      <div class="dashboard-header">
+        <h2 class="dashboard-title">👑 Taj Banjara Hotel - Dashboard 👑</h2>
+        <div class="dashboard-meta">
+          <span id="dash-time" class="dash-meta-item">--</span>
+          <span id="dash-user" class="dash-meta-item dash-meta-user">Logged in as: Staff</span>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Ribbon -->
+      <div class="metrics-ribbon">
+        <div class="metric-card">
+          <div class="metric-val" id="kpi-available">--</div>
+          <div class="metric-label">Available Rooms</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="kpi-occupied">--</div>
+          <div class="metric-label">Occupied Rooms</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="kpi-cleaning">--</div>
+          <div class="metric-label">Needs Cleaning</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val" id="kpi-revenue">₹--</div>
+          <div class="metric-label">Monthly Revenue</div>
+        </div>
+      </div>
+
+      <!-- Module Buttons Grid (10 Modules) -->
+      <div class="dashboard-grid">
+        <button class="dash-btn" data-target="view-booking">
+          <span class="dash-btn-icon">🏨</span>
+          <span class="dash-btn-text">Book Room</span>
+        </button>
+        <button class="dash-btn" data-target="view-checkout">
+          <span class="dash-btn-icon">💵</span>
+          <span class="dash-btn-text">Checkout</span>
+        </button>
+        <button class="dash-btn" data-target="view-search">
+          <span class="dash-btn-icon">🔍</span>
+          <span class="dash-btn-text">Search Guest</span>
+        </button>
+        <button class="dash-btn" data-target="view-room-status">
+          <span class="dash-btn-icon">🛏️</span>
+          <span class="dash-btn-text">Room Status</span>
+        </button>
+        <button class="dash-btn" data-target="view-staff">
+          <span class="dash-btn-icon">👨‍💼</span>
+          <span class="dash-btn-text">Staff Management</span>
+        </button>
+        <button class="dash-btn" data-target="view-history">
+          <span class="dash-btn-icon">📜</span>
+          <span class="dash-btn-text">Booking History</span>
+        </button>
+        <button class="dash-btn" data-target="view-update">
+          <span class="dash-btn-icon">🔄</span>
+          <span class="dash-btn-text">Update Booking</span>
+        </button>
+        <button class="dash-btn" data-target="view-housekeeping">
+          <span class="dash-btn-icon">🧹</span>
+          <span class="dash-btn-text">Housekeeping</span>
+        </button>
+        <button class="dash-btn" data-target="view-revenue">
+          <span class="dash-btn-icon">📈</span>
+          <span class="dash-btn-text">Revenue Report</span>
+        </button>
+        <button class="dash-btn btn-danger-dash" id="btn-dash-exit">
+          <span class="dash-btn-icon">🚪</span>
+          <span class="dash-btn-text">Exit</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 5. Book Room View -->
+    <section id="view-booking" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">★ Room Booking</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div id="booking-room-badge" class="room-assigned-banner">Room No (Auto-Assigned): Loading...</div>
+
+        <form id="booking-form" class="hms-form">
+          <div class="form-group">
+            <label for="book-name">Guest Name:</label>
+            <input type="text" id="book-name" class="hms-input" placeholder="Enter guest full name" required>
+          </div>
+          <div class="form-group">
+            <label for="book-days">Number of Days:</label>
+            <input type="number" id="book-days" class="hms-input" min="1" max="90" placeholder="e.g. 3" required>
+          </div>
+
+          <div class="form-group">
+            <label>Food Option:</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="book-food" value="None" checked>
+                <span>None (₹0/day)</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="book-food" value="Normal">
+                <span>Normal (₹500/day)</span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="book-food" value="VIP">
+                <span>VIP (₹1000/day)</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="booking-feedback" class="feedback-msg"></div>
+
+          <div class="form-actions">
+            <button type="submit" id="btn-confirm-book" class="btn-gold btn-large">Book Room</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- 6. Checkout View -->
+    <section id="view-checkout" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">💵 Checkout &amp; Billing</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="inline-search-bar">
+          <label for="checkout-room-select">Select Room Number:</label>
+          <select id="checkout-room-select" class="hms-input select-inline">
+            <option value="">-- Choose Booked Room --</option>
+          </select>
+          <button type="button" id="btn-calc-bill" class="btn-gold">Calculate Bill</button>
+        </div>
+
+        <div id="bill-display-box" class="receipt-box hidden">
+          <pre id="bill-content" class="receipt-text"></pre>
+        </div>
+
+        <div id="checkout-feedback" class="feedback-msg"></div>
+
+        <div class="form-actions">
+          <button type="button" id="btn-confirm-checkout" class="btn-gold btn-large hidden">Checkout &amp; Confirm Payment</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Search Guest View -->
+    <section id="view-search" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🔍 Search Guest</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="inline-search-bar">
+          <label for="guest-search-input">Guest Name:</label>
+          <input type="text" id="guest-search-input" class="hms-input" placeholder="Type guest name to search..." autofocus>
+          <button type="button" id="btn-exec-search" class="btn-gold">Search</button>
+        </div>
+
+        <div id="search-feedback" class="feedback-msg"></div>
+
+        <div class="table-responsive">
+          <table class="hms-table">
+            <thead>
+              <tr>
+                <th>Room No</th>
+                <th>Guest Name</th>
+                <th>Check-in Date/Time</th>
+                <th>Days</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="guest-search-tbody">
+              <tr><td colspan="5" class="table-empty">Enter a guest name above to search.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. Room Status View -->
+    <section id="view-room-status" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🛏️ Room Status</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <!-- Visual Grid of 10 Rooms -->
+        <div class="room-cards-grid" id="room-cards-grid"></div>
+
+        <div class="table-responsive">
+          <table class="hms-table">
+            <thead>
+              <tr>
+                <th>Room No</th>
+                <th>Status</th>
+                <th>Guest</th>
+                <th>Days</th>
+                <th>Food Plan</th>
+              </tr>
+            </thead>
+            <tbody id="room-status-tbody">
+              <tr><td colspan="5" class="table-empty">Loading room status...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 9. Staff Management View -->
+    <section id="view-staff" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">👨‍💼 Staff Management</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="tab-strip">
+          <button class="tab-btn active" data-tab="tab-view-staff">View / Edit Staff</button>
+          <button class="tab-btn" data-tab="tab-add-staff">Add New Staff</button>
+        </div>
+
+        <!-- Tab 1: View Staff -->
+        <div id="tab-view-staff" class="tab-content active">
+          <div class="table-responsive">
+            <table class="hms-table">
+              <thead>
+                <tr>
+                  <th>Staff ID</th>
+                  <th>Name</th>
+                  <th>Designation</th>
+                  <th>Contact</th>
+                  <th>Username</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="staff-tbody">
+                <tr><td colspan="6" class="table-empty">Loading staff records...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Add Staff -->
+        <div id="tab-add-staff" class="tab-content">
+          <form id="add-staff-form" class="hms-form max-w-md">
+            <div class="form-group">
+              <label for="new-staff-name">Staff Name:</label>
+              <input type="text" id="new-staff-name" class="hms-input" placeholder="Full name" required>
+            </div>
+            <div class="form-group">
+              <label for="new-staff-desig">Designation:</label>
+              <input type="text" id="new-staff-desig" class="hms-input" placeholder="e.g. Receptionist, Concierge" required>
+            </div>
+            <div class="form-group">
+              <label for="new-staff-contact">Contact:</label>
+              <input type="text" id="new-staff-contact" class="hms-input" placeholder="e.g. 9900000005" required>
+            </div>
+            <div class="form-group">
+              <label for="new-staff-username">Username:</label>
+              <input type="text" id="new-staff-username" class="hms-input" placeholder="Login username" required autocomplete="username">
+            </div>
+            <div class="form-group">
+              <label for="new-staff-password">Password:</label>
+              <input type="password" id="new-staff-password" class="hms-input" placeholder="Password" required autocomplete="new-password">
+            </div>
+
+            <div id="add-staff-feedback" class="feedback-msg"></div>
+
+            <button type="submit" class="btn-gold btn-block">Add Staff</button>
+          </form>
+        </div>
+
+        <div id="staff-feedback" class="feedback-msg"></div>
+      </div>
+    </section>
+
+    <!-- 10. Booking History View -->
+    <section id="view-history" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">📜 Booking History</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="table-responsive">
+          <table class="hms-table">
+            <thead>
+              <tr>
+                <th>Room No</th>
+                <th>Guest</th>
+                <th>Check-in Date/Time</th>
+                <th>Checkout Date/Time</th>
+                <th>Days</th>
+                <th>Food Plan</th>
+                <th>Status</th>
+                <th>Total Billed</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr><td colspan="8" class="table-empty">Loading booking history...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 11. Update Booking View -->
+    <section id="view-update" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🔄 Update Booking</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="inline-search-bar">
+          <label for="update-room-input">Search by Room No:</label>
+          <input type="text" id="update-room-input" class="hms-input" placeholder="e.g. 101">
+          <button type="button" id="btn-search-update" class="btn-gold">Search</button>
+        </div>
+
+        <div id="update-details-box" class="card-inner hidden">
+          <div id="update-current-info" class="current-info-banner">Current details...</div>
+
+          <form id="update-booking-form" class="hms-form">
+            <div class="form-group">
+              <label for="update-days">New Days:</label>
+              <input type="number" id="update-days" class="hms-input" min="1" max="90" required>
+            </div>
+            <div class="form-group">
+              <label for="update-food">New Food Plan:</label>
+              <select id="update-food" class="hms-input select-inline">
+                <option value="None">None (₹0/day)</option>
+                <option value="Normal">Normal (₹500/day)</option>
+                <option value="VIP">VIP (₹1000/day)</option>
+              </select>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn-gold btn-large">Apply Update</button>
+            </div>
+          </form>
+        </div>
+
+        <div id="update-feedback" class="feedback-msg"></div>
+      </div>
+    </section>
+
+    <!-- 12. Housekeeping Status View -->
+    <section id="view-housekeeping" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🧹 Housekeeping Status</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <p class="section-help">Click any room's action button to cycle its status: <strong>Clean</strong> → <strong>Needs Cleaning</strong> → <strong>In Progress</strong> → <strong>Clean</strong>.</p>
+
+        <div id="housekeeping-feedback" class="feedback-msg"></div>
+
+        <div class="table-responsive">
+          <table class="hms-table">
+            <thead>
+              <tr>
+                <th>Room No</th>
+                <th>Status</th>
+                <th>Last Cleaned By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="housekeeping-tbody">
+              <tr><td colspan="4" class="table-empty">Loading housekeeping status...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 13. Revenue Report View -->
+    <section id="view-revenue" class="view-panel">
+      <div class="panel-header">
+        <h2 class="panel-title">📈 Revenue Report</h2>
+        <button class="btn-secondary nav-to-dash">← Back to Dashboard</button>
+      </div>
+
+      <div class="card-container">
+        <div class="tab-strip revenue-tabs">
+          <button class="btn-gold rev-filter-btn" data-period="Daily">Daily Report</button>
+          <button class="btn-gold rev-filter-btn" data-period="Weekly">Weekly Report</button>
+          <button class="btn-gold rev-filter-btn active" data-period="Monthly">Monthly Report</button>
+          <button class="btn-gold rev-filter-btn" data-period="All Time">All Time Report</button>
+        </div>
+
+        <div class="receipt-box revenue-box">
+          <pre id="revenue-report-text" class="receipt-text"></pre>
+        </div>
+
+        <div id="revenue-feedback" class="feedback-msg"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Edit Staff Modal -->
+  <div id="edit-staff-modal" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-staff-title">Edit Staff Details</h3>
+        <button type="button" class="modal-close-btn" id="modal-staff-close">&times;</button>
+      </div>
+      <form id="edit-staff-form" class="hms-form">
+        <input type="hidden" id="edit-staff-id">
+        <div class="form-group">
+          <label for="edit-staff-name">Name:</label>
+          <input type="text" id="edit-staff-name" class="hms-input" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-staff-desig">Designation:</label>
+          <input type="text" id="edit-staff-desig" class="hms-input" required>
+        </div>
+        <div class="form-group">
+          <label for="edit-staff-contact">Contact:</label>
+          <input type="text" id="edit-staff-contact" class="hms-input" required>
+        </div>
+        <div id="modal-feedback" class="feedback-msg"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn-gold btn-block">Save Changes</button>
+          <button type="button" class="btn-secondary btn-block" id="modal-staff-cancel">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom System Status Bar (Identical to Desktop) -->
+  <footer class="system-status-bar" id="system-status-bar">
+    <span id="status-text">[--:--:--] System Ready.</span>
+  </footer>
+
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
