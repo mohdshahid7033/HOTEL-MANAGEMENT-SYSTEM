@@ -857,5 +857,353 @@ class TestHotelBackend(unittest.TestCase):
                 except OSError:
                     pass
 
+    def test_demo_login_missing_account_does_not_reseed_or_overwrite_admin(self):
+        """Proves missing demo_staff does not trigger reseeding or modify administrator and bookings."""
+        # Record baseline admin credentials and booking state
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        orig_admin = conn.execute("SELECT * FROM staff WHERE login_username = 'admin'").fetchone()
+        self.assertIsNotNone(orig_admin)
+        orig_bookings = conn.execute("SELECT id, room_no, guest_name FROM bookings ORDER BY id").fetchall()
+
+        # Delete demo_staff
+        conn.execute("DELETE FROM staff WHERE login_username = 'demo_staff'")
+        conn.commit()
+        conn.close()
+
+        # Attempt demo login
+        csrf = self.get_csrf()
+        resp = self.client.post('/api/auth/demo-login', json={'role': 'receptionist'}, headers={
+            'X-CSRF-Token': csrf,
+            'Content-Type': 'application/json'
+        })
+        self.assertEqual(resp.status_code, 404)
+        data = resp.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn("Demo receptionist account is unavailable", data['error'])
+
+        # Verify database was NOT mutated
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        demo_staff = conn.execute("SELECT * FROM staff WHERE login_username = 'demo_staff'").fetchone()
+        self.assertIsNone(demo_staff, "demo_staff must NOT be automatically reseeded on failed demo login")
+
+        curr_admin = conn.execute("SELECT * FROM staff WHERE login_username = 'admin'").fetchone()
+        self.assertEqual(curr_admin['login_password'], orig_admin['login_password'], "Admin password must not change")
+        self.assertEqual(curr_admin['password_salt'], orig_admin['password_salt'], "Admin salt must not change")
+
+        curr_bookings = conn.execute("SELECT id, room_no, guest_name FROM bookings ORDER BY id").fetchall()
+        self.assertEqual(len(curr_bookings), len(orig_bookings), "Bookings must not be deleted or modified")
+        for b_orig, b_curr in zip(orig_bookings, curr_bookings):
+            self.assertEqual(b_orig['id'], b_curr['id'])
+            self.assertEqual(b_orig['room_no'], b_curr['room_no'])
+            self.assertEqual(b_orig['guest_name'], b_curr['guest_name'])
+        conn.close()
+
+    def test_setup_token_enforcement(self):
+        """Proves SETUP_TOKEN is strictly enforced via constant-time verification for admin setup."""
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            token_db = os.path.join(temp_dir.name, 'token_test.db')
+            test_token = "secure-render-setup-token-998877"
+
+            class TokenConfig(Config):
+                TESTING = True
+                DATABASE_PATH = token_db
+                SECRET_KEY = "test-token-secret-key-32-chars-long"
+                SETUP_TOKEN = test_token
+                DEMO_MODE = True
+                WTF_CSRF_ENABLED = False
+
+            token_app = create_app(TokenConfig)
+
+            # Clear staff table so first-time setup is active (0 staff)
+            conn = sqlite3.connect(token_db)
+            conn.execute("DELETE FROM staff")
+            conn.commit()
+            conn.close()
+
+            client = token_app.test_client()
+            csrf = self.get_csrf(client)
+            base_headers = {'X-CSRF-Token': csrf, 'Content-Type': 'application/json'}
+
+            setup_payload = {
+                "name": "Token Admin",
+                "contact": "9876543210",
+                "username": "tokenadmin",
+                "password": "TokenPassword@2026",
+                "confirm_password": "TokenPassword@2026"
+            }
+
+            # 1. Missing token -> 403
+            resp = client.post('/api/auth/setup', json=setup_payload, headers=base_headers)
+            self.assertEqual(resp.status_code, 403)
+            self.assertIn("Invalid setup token", resp.get_json()['error'])
+
+            # 2. Invalid token in header -> 403
+            h_invalid = dict(base_headers, **{'X-Setup-Token': 'wrong-token'})
+            resp = client.post('/api/auth/setup', json=setup_payload, headers=h_invalid)
+            self.assertEqual(resp.status_code, 403)
+            self.assertIn("Invalid setup token", resp.get_json()['error'])
+
+            # 3. Invalid token in JSON body -> 403
+            invalid_body = dict(setup_payload, setup_token='wrong-token-body')
+            resp = client.post('/api/auth/setup', json=invalid_body, headers=base_headers)
+            self.assertEqual(resp.status_code, 403)
+            self.assertIn("Invalid setup token", resp.get_json()['error'])
+
+            # 4. Valid token in header -> 200
+            h_valid = dict(base_headers, **{'X-Setup-Token': test_token})
+            resp = client.post('/api/auth/setup', json=setup_payload, headers=h_valid)
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(resp.get_json()['success'])
+
+            # 5. Subsequent attempt after staff exists -> 403 (already completed)
+            resp = client.post('/api/auth/setup', json=setup_payload, headers=h_valid)
+            self.assertEqual(resp.status_code, 403)
+            self.assertIn("Setup has already been completed", resp.get_json()['error'])
+
+            # 6. Valid token via JSON body on a fresh database
+            token_db2 = os.path.join(temp_dir.name, 'token_test2.db')
+            class TokenConfig2(Config):
+                TESTING = True
+                DATABASE_PATH = token_db2
+                SECRET_KEY = "test-token-secret-key-32-chars-long"
+                SETUP_TOKEN = test_token
+                DEMO_MODE = True
+                WTF_CSRF_ENABLED = False
+
+            token_app2 = create_app(TokenConfig2)
+            conn2 = sqlite3.connect(token_db2)
+            conn2.execute("DELETE FROM staff")
+            conn2.commit()
+            conn2.close()
+
+            client2 = token_app2.test_client()
+            csrf2 = self.get_csrf(client2)
+            body_valid = dict(setup_payload, setup_token=test_token)
+            resp2 = client2.post('/api/auth/setup', json=body_valid, headers={'X-CSRF-Token': csrf2, 'Content-Type': 'application/json'})
+            self.assertEqual(resp2.status_code, 200)
+            self.assertTrue(resp2.get_json()['success'])
+        finally:
+            temp_dir.cleanup()
+
+    def test_ephemeral_database_fresh_startup_and_recovery(self):
+        """Proves ephemeral database initializes cleanly on fresh container startup or restart."""
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            ephemeral_db = os.path.join(temp_dir.name, 'fresh_ephemeral.db')
+            self.assertFalse(os.path.exists(ephemeral_db), "Database file must not exist before initialization")
+
+            class EphemeralConfig(Config):
+                TESTING = True
+                DATABASE_PATH = ephemeral_db
+                SECRET_KEY = "ephemeral-test-secret-key-32-chars"
+                DEMO_MODE = True
+                WTF_CSRF_ENABLED = False
+
+            app = create_app(EphemeralConfig)
+            self.assertTrue(os.path.exists(ephemeral_db), "Database file must be automatically created")
+
+            # Verify tables and seed data
+            conn = sqlite3.connect(ephemeral_db)
+            conn.row_factory = sqlite3.Row
+            tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+            self.assertIn('staff', tables)
+            self.assertIn('bookings', tables)
+            self.assertIn('housekeeping', tables)
+
+            admin = conn.execute("SELECT * FROM staff WHERE login_username = 'admin'").fetchone()
+            self.assertIsNotNone(admin)
+            demo_user = conn.execute("SELECT * FROM staff WHERE login_username = 'demo_staff'").fetchone()
+            self.assertIsNotNone(demo_user)
+            conn.close()
+
+            # Verify /health endpoint returns healthy
+            client = app.test_client()
+            resp = client.get('/health')
+            self.assertEqual(resp.status_code, 200)
+            self.assertEqual(resp.get_json()['status'], 'healthy')
+        finally:
+            temp_dir.cleanup()
+
+    def test_first_time_admin_setup_password_validation_and_rejection(self):
+        """Proves first-time setup enforces minimum 10 chars, rejects whitespace/weak passwords, and accepts valid credentials."""
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            setup_db = os.path.join(temp_dir.name, 'setup_val_test.db')
+
+            class SetupConfig(Config):
+                TESTING = True
+                DATABASE_PATH = setup_db
+                SECRET_KEY = "setup-val-test-secret-key-32chars"
+                DEMO_MODE = False
+                WTF_CSRF_ENABLED = False
+
+            setup_app = create_app(SetupConfig)
+
+            # Ensure staff table is empty so setup is genuinely available
+            conn = sqlite3.connect(setup_db)
+            conn.execute("DELETE FROM staff")
+            conn.commit()
+            conn.close()
+
+            client = setup_app.test_client()
+            csrf = self.get_csrf(client)
+            headers = {'X-CSRF-Token': csrf, 'Content-Type': 'application/json'}
+
+            # 1. Short password (< 10 characters) is rejected
+            short_payload = {
+                "name": "Setup Admin",
+                "contact": "9876543210",
+                "username": "setupadmin",
+                "password": "Short#1",
+                "confirm_password": "Short#1"
+            }
+            resp = client.post('/api/auth/setup', json=short_payload, headers=headers)
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("at least 10 characters", resp.get_json()['error'])
+
+            # Also verify via /api/setup/admin route
+            resp = client.post('/api/setup/admin', json=short_payload, headers=headers)
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("at least 10 characters", resp.get_json()['error'])
+
+            # 2. Whitespace-only password is rejected
+            ws_payload = {
+                "name": "Setup Admin",
+                "contact": "9876543210",
+                "username": "setupadmin",
+                "password": "          ",
+                "confirm_password": "          "
+            }
+            resp = client.post('/api/auth/setup', json=ws_payload, headers=headers)
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("blank or whitespace", resp.get_json()['error'])
+
+            # 3. Known weak / default passwords are rejected
+            weak_passwords = [
+                'AdminSecure@2026',
+                'DevAdmin@LocalOnly#2026',
+                'administrator',
+                'password',
+                'admin123',
+                '12345678'
+            ]
+            for weak_pw in weak_passwords:
+                weak_payload = {
+                    "name": "Setup Admin",
+                    "contact": "9876543210",
+                    "username": "setupadmin",
+                    "password": weak_pw,
+                    "confirm_password": weak_pw
+                }
+                resp = client.post('/api/auth/setup', json=weak_payload, headers=headers)
+                self.assertEqual(resp.status_code, 400)
+                self.assertIn("too weak or commonly used", resp.get_json()['error'])
+
+            # 4. Mismatched confirmation is rejected
+            mismatch_payload = {
+                "name": "Setup Admin",
+                "contact": "9876543210",
+                "username": "setupadmin",
+                "password": "ValidStrongPass#2026",
+                "confirm_password": "DifferentPass#2026"
+            }
+            resp = client.post('/api/auth/setup', json=mismatch_payload, headers=headers)
+            self.assertEqual(resp.status_code, 400)
+            self.assertIn("do not match", resp.get_json()['error'])
+
+            # 5. Valid strong password is accepted when setup is available
+            valid_payload = {
+                "name": "Setup Admin",
+                "contact": "9876543210",
+                "username": "setupadmin",
+                "password": "ValidStrongPass#2026",
+                "confirm_password": "ValidStrongPass#2026"
+            }
+            resp = client.post('/api/auth/setup', json=valid_payload, headers=headers)
+            self.assertEqual(resp.status_code, 200)
+            self.assertTrue(resp.get_json()['success'])
+            self.assertIn("created successfully", resp.get_json()['message'])
+
+            # Verify in database: secure hash and unique salt created, plaintext not stored
+            conn = sqlite3.connect(setup_db)
+            conn.row_factory = sqlite3.Row
+            admin = conn.execute("SELECT * FROM staff WHERE login_username = 'setupadmin'").fetchone()
+            self.assertIsNotNone(admin)
+            self.assertEqual(admin['designation'], 'Manager')
+            self.assertEqual(len(admin['password_salt']), 32)
+            self.assertEqual(len(admin['login_password']), 64)
+            self.assertNotEqual(admin['login_password'], "ValidStrongPass#2026")
+            self.assertTrue(verify_password("ValidStrongPass#2026", admin['login_password'], admin['password_salt']))
+            conn.close()
+
+            # 6. Subsequent setup attempts remain rejected once staff exists
+            resp = client.post('/api/auth/setup', json=valid_payload, headers=headers)
+            self.assertEqual(resp.status_code, 403)
+            self.assertIn("Setup has already been completed", resp.get_json()['error'])
+        finally:
+            temp_dir.cleanup()
+
+    def test_rejected_setup_attempts_preserve_existing_records(self):
+        """Proves rejected setup attempts do not alter existing administrator, staff, or bookings."""
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            preserve_db = os.path.join(temp_dir.name, 'preserve_test.db')
+
+            class PreserveConfig(Config):
+                TESTING = True
+                DATABASE_PATH = preserve_db
+                SECRET_KEY = "preserve-test-secret-key-32chars"
+                DEMO_MODE = True
+                WTF_CSRF_ENABLED = False
+
+            app = create_app(PreserveConfig)
+
+            # Record initial snapshot of database
+            conn = sqlite3.connect(preserve_db)
+            conn.row_factory = sqlite3.Row
+            initial_staff = [dict(row) for row in conn.execute("SELECT staff_id, name, designation, login_username, login_password, password_salt FROM staff ORDER BY staff_id").fetchall()]
+            initial_bookings = [dict(row) for row in conn.execute("SELECT id, room_no, guest_name, days, status FROM bookings ORDER BY id").fetchall()]
+            initial_housekeeping = [dict(row) for row in conn.execute("SELECT room_no, status FROM housekeeping ORDER BY room_no").fetchall()]
+            conn.close()
+
+            self.assertGreater(len(initial_staff), 0)
+            self.assertGreater(len(initial_bookings), 0)
+
+            client = app.test_client()
+            csrf = self.get_csrf(client)
+            headers = {'X-CSRF-Token': csrf, 'Content-Type': 'application/json'}
+
+            # Attempt rejected setup calls
+            rejected_payloads = [
+                {"name": "Attacker", "contact": "0000000000", "username": "admin", "password": "Short#1", "confirm_password": "Short#1"},
+                {"name": "Attacker", "contact": "0000000000", "username": "admin", "password": "password", "confirm_password": "password"},
+                {"name": "Attacker", "contact": "0000000000", "username": "admin", "password": "          ", "confirm_password": "          "},
+                {"name": "Attacker", "contact": "0000000000", "username": "admin", "password": "ValidPass#2026", "confirm_password": "Mismatch#2026"},
+                {"name": "Attacker", "contact": "0000000000", "username": "newadmin", "password": "ValidStrongPass#2026", "confirm_password": "ValidStrongPass#2026"}
+            ]
+
+            for payload in rejected_payloads:
+                r1 = client.post('/api/auth/setup', json=payload, headers=headers)
+                self.assertIn(r1.status_code, (400, 403))
+                r2 = client.post('/api/setup/admin', json=payload, headers=headers)
+                self.assertIn(r2.status_code, (400, 403))
+
+            # Verify snapshot is 100% identical
+            conn = sqlite3.connect(preserve_db)
+            conn.row_factory = sqlite3.Row
+            current_staff = [dict(row) for row in conn.execute("SELECT staff_id, name, designation, login_username, login_password, password_salt FROM staff ORDER BY staff_id").fetchall()]
+            current_bookings = [dict(row) for row in conn.execute("SELECT id, room_no, guest_name, days, status FROM bookings ORDER BY id").fetchall()]
+            current_housekeeping = [dict(row) for row in conn.execute("SELECT room_no, status FROM housekeeping ORDER BY room_no").fetchall()]
+            conn.close()
+
+            self.assertEqual(initial_staff, current_staff, "Staff records must remain strictly unchanged")
+            self.assertEqual(initial_bookings, current_bookings, "Bookings must remain strictly unchanged")
+            self.assertEqual(initial_housekeeping, current_housekeeping, "Housekeeping records must remain strictly unchanged")
+        finally:
+            temp_dir.cleanup()
+
 if __name__ == '__main__':
     unittest.main()

@@ -88,30 +88,41 @@ All financial calculations strictly replicate the original application formulas:
    - Administrative endpoints (`/api/staff`, `/api/demo/reset`) are guarded by `@admin_required`, returning HTTP 403 Forbidden to demo receptionists or unprivileged users.
 5. **Setup Lockout**:
    - Once the database is initialized, the setup endpoint (`/api/auth/setup` and `/api/setup/admin`) permanently returns HTTP 403 Forbidden to prevent public tampering.
-6. **Fail-Safe Storage Verification**:
-   - In production, the system verifies persistent disk mounts and write permissions before startup (`verify_storage_path`). If persistent storage is unmounted or unavailable, the application halts startup safely with a `RuntimeError` rather than silently using an unexpected ephemeral location.
+6. **Storage Verification**:
+   - The application verifies storage availability and write permissions at startup.
+   - Persistent storage is required only when `REQUIRE_PERSISTENT_STORAGE` is enabled or the production database path is configured under `/var/data`.
+   - The Render Free deployment uses `/tmp/hotel_web.db` on ephemeral storage and does not require a persistent disk. Database changes may be lost when the service restarts, spins down, or is redeployed.
 
 ---
 
-## 6. Render Persistence & Hosting Economics
+## 6. Render Free-Tier Hosting & Ephemeral Architecture
 
-### The Ephemeral Filesystem Challenge
-On Render's **Free Web Service** tier, the disk filesystem is **ephemeral**. This means:
-- Any file written to disk (including SQLite databases) is wiped whenever the instance spins down due to inactivity (after 15 minutes of idle time) or when new code is deployed.
-- A free-tier deployment will automatically reseed clean synthetic demo data upon every restart, which is safe for demo purposes but does not retain persistent changes across cold starts.
+### Free Web Service Plan (Zero Persistent Disks)
+This portfolio demonstration is configured for **Render's Free Web Service Tier** ($0/month, zero persistent disks):
+- **Free Instance Tier**: Runs on Render's 0.1 CPU, 512 MB RAM free container tier.
+- **Zero Paid Subscriptions**: Requires no paid disks ($0.25/GB/mo) and no paid plans ($7/mo Starter).
+- **Ephemeral Storage**: SQLite is stored at `/tmp/hotel_web.db`.
 
-### True Persistence Configuration (Render Persistent Disk)
-To maintain real persistent data across server redeployments and restarts:
-1. Attach a **Render Persistent Disk** mounted at `/var/data`.
-2. Configure the environment variable:
-   ```env
-   DATABASE_PATH=/var/data/hotel_web.db
-   ```
-3. **Hosting Cost Breakdown**:
-   - Render Persistent Disks require a paid instance plan (minimum **Starter Plan** at **$7.00 / month**).
-   - Persistent Disk storage costs **$0.25 / GB / month** (a 1 GB disk costs $0.25/mo).
-   - **Total Estimated Cost for Persistent Hosting**: **$7.25 / month**.
-4. Both deployment styles are fully supported by `web-app/render.yaml` and `web-app/config.py`.
+### How Ephemeral Storage Operates in the Free Tier
+On Render's Free Web Service tier:
+1. **Inactivity Sleep**: The instance spins down to conserve resources after 15 minutes of inactivity.
+2. **Ephemeral Filesystem**: Because no paid persistent disk is configured, the local filesystem is ephemeral. Bookings, staff changes, and other database modifications must be considered temporary. Data may be lost whenever the service restarts, spins down due to inactivity, or is redeployed.
+3. **Demo Initialization**: When a container starts with a fresh or uninitialized filesystem, the application automatically initializes a clean SQLite database and seeds synthetic demo records using the configured initialization process (`seed_safe_demo_data`). This ensures the public portfolio demo remains operational without requiring manual database administration.
+
+### Required Environment Variables
+The application configures the following environment variables (defined in `web-app/render.yaml`):
+
+| Variable | Recommended Render Value | Purpose |
+| :--- | :--- | :--- |
+| `PYTHON_VERSION` | `3.11.8` | Ensures consistent, tested CPython runtime |
+| `SECRET_KEY` | *(Generate via Render)* | 32+ character random secret for secure session encryption |
+| `INITIAL_ADMIN_PASSWORD` | *(Generate via Render)* | Strong random password for initial administrator provisioning |
+| `SETUP_TOKEN` | *(Generate via Render)* | Cryptographic token protecting first-time setup via constant-time verification |
+| `DATABASE_PATH` | `/tmp/hotel_web.db` | Standard Linux temporary path for ephemeral SQLite storage |
+| `DEMO_MODE` | `true` | Enables safe portfolio demo features (Demo Receptionist login) |
+
+> [!NOTE]
+> **Optional Persistent Storage (Paid)**: If permanent data retention across restarts is desired in the future, the application can be seamlessly transitioned to a Render Starter plan ($7/mo) with a 1 GB persistent disk ($0.25/mo) mounted at `/var/data` and `DATABASE_PATH=/var/data/hotel_web.db`. Both modes are fully supported by `config.py`.
 
 ---
 
@@ -119,17 +130,17 @@ To maintain real persistent data across server redeployments and restarts:
 
 ### Prerequisites
 - Python 3.10+ (tested with Python 3.11, 3.12, 3.14)
-- Web browser (Chrome, Firefox, Safari, Edge)
+- Modern web browser (Chrome, Firefox, Safari, Edge)
 
 ### Step 1: Install Dependencies
 ```bash
 pip install -r web-app/requirements.txt
 ```
 
-### Step 2: Run Automated Test Suite
-Run the 16 unit, integration, and security tests:
+### Step 2: Run Full Automated Test Suite
+Run the automated unit, integration, security, and end-to-end tests with strict ResourceWarning detection:
 ```bash
-python web-app/tests/test_backend.py
+python -W error::ResourceWarning -m unittest discover -v -s web-app/tests
 ```
 
 ### Step 3: Start Local Web Server
@@ -147,35 +158,40 @@ http://127.0.0.1:5000
 
 ---
 
-## 8. Step-by-Step Render Deployment Guide
+## 8. Step-by-Step Render Free-Tier Deployment Guide
 
-1. **Repository Setup**:
-   Ensure `web-app/` and its configuration files are committed to your GitHub/GitLab repository.
-2. **Create New Web Service on Render**:
-   - Log in to your [Render Dashboard](https://dashboard.render.com/).
-   - Click **New +** $\rightarrow$ **Web Service**.
-   - Connect your GitHub repository.
-3. **Configure Service Settings**:
+### Option A: Blueprint Deployment (Recommended)
+1. Push your repository to GitHub: `https://github.com/mohdshahid7033/HOTEL-MANAGEMENT-SYSTEM`.
+2. Log in to the [Render Dashboard](https://dashboard.render.com/).
+3. Click **New +** $\rightarrow$ **Blueprint**.
+4. Connect the `HOTEL-MANAGEMENT-SYSTEM` repository.
+5. In the Blueprint configuration, specify or select the nested Blueprint file path `web-app/render.yaml` (since the blueprint file is located in the nested `web-app/` subdirectory rather than the repository root).
+6. Render parses `web-app/render.yaml` and provisions:
+   - Free Web Service plan ($0.00/mo).
+   - Zero persistent disks.
+   - Auto-generated secure values for `SECRET_KEY`, `INITIAL_ADMIN_PASSWORD`, and `SETUP_TOKEN`.
+   - Ephemeral database storage at `/tmp/hotel_web.db`.
+7. Click **Apply**. Render builds the service and outputs your live public HTTPS URL.
+
+### Option B: Manual Web Service Setup
+If configuring manually without the Blueprint:
+1. In the Render Dashboard, click **New +** $\rightarrow$ **Web Service**.
+2. Connect your GitHub repository.
+3. Configure the service settings:
    - **Name**: `taj-banjara-hotel-management`
    - **Region**: Choose the closest region (e.g., Singapore, Frankfurt, Oregon).
    - **Branch**: `main`
-   - **Root Directory**: Leave blank (or specify `web-app` if deploying the subdirectory directly).
+   - **Root Directory**: *(Leave blank)*
    - **Runtime**: `Python 3`
    - **Build Command**: `pip install -r web-app/requirements.txt`
    - **Start Command**: `gunicorn --chdir web-app --workers 1 --threads 4 app:app`
-4. **Environment Variables**:
-   Under **Environment Variables**, add:
-   - `SECRET_KEY`: (Click "Generate" or provide a secure random key)
-   - `INITIAL_ADMIN_PASSWORD`: (Provide a secure password of at least 10 characters; production rejects default or hardcoded passwords)
+   - **Instance Type / Plan**: **Free** ($0.00 / month). Do **NOT** attach any disk.
+4. Under **Environment Variables**, add:
+   - `PYTHON_VERSION`: `3.11.8`
+   - `SECRET_KEY`: Click **Generate** (or enter a random 32+ character string).
+   - `INITIAL_ADMIN_PASSWORD`: Click **Generate** (or enter a secure 12+ character password).
+   - `SETUP_TOKEN`: Click **Generate** (or enter a secure random token).
+   - `DATABASE_PATH`: `/tmp/hotel_web.db`
    - `DEMO_MODE`: `true`
-   - `DATABASE_PATH`: `/var/data/hotel_web.db` (if using Persistent Disk) or `web-app/data/hotel_web.db` (if using ephemeral disk).
-5. **(Optional) Add Persistent Disk**:
-   - If using the Starter Plan ($7/mo), scroll to **Disks** $\rightarrow$ **Add Disk**.
-   - **Name**: `hotel-data-disk`
-   - **Mount Path**: `/var/data`
-   - **Size**: `1 GB`
-6. **Health Check Path**:
-   - Set **Health Check Path** to `/health`.
-7. **Deploy**:
-   - Click **Create Web Service**.
-   - Render will build the environment, launch Gunicorn, verify the `/health` check, and publish your live URL.
+5. Under **Health Check Path**, enter: `/health`.
+6. Click **Create Web Service**. Render builds the Python environment, runs the health check, and deploys the live demo.

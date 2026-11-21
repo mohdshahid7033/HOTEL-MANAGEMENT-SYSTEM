@@ -1,9 +1,10 @@
 import os
+import hmac
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, session, g
 
 from config import Config
-from database import get_db, close_db, init_db, reset_to_clean_demo
+from database import get_db, close_db, init_db, reset_to_clean_demo, DISALLOWED_ADMIN_PASSWORDS
 from auth import (
     hash_password,
     verify_password,
@@ -142,7 +143,7 @@ def create_app(config_class=Config):
         expected_token = app.config.get('SETUP_TOKEN')
         if expected_token:
             provided_token = request.headers.get('X-Setup-Token') or (request.json or {}).get('setup_token')
-            if provided_token != expected_token:
+            if not provided_token or not hmac.compare_digest(str(provided_token), str(expected_token)):
                 return jsonify({
                     "success": False,
                     "error": "Invalid setup token. Administrative setup is protected."
@@ -159,12 +160,25 @@ def create_app(config_class=Config):
             return jsonify({"success": False, "error": "All fields are required."}), 400
 
         if not password.strip():
-            return jsonify({"success": False, "error": "Password cannot be blank."}), 400
+            return jsonify({"success": False, "error": "Password cannot be blank or whitespace-only."}), 400
 
         if password != confirm_password:
             return jsonify({"success": False, "error": "Passwords do not match."}), 400
 
-        salt, pw_hash = hash_password(password)
+        cleaned_password = password.strip()
+        if cleaned_password.lower() in DISALLOWED_ADMIN_PASSWORDS:
+            return jsonify({
+                "success": False,
+                "error": "Password is too weak or commonly used. Please choose a stronger password."
+            }), 400
+
+        if len(cleaned_password) < 10:
+            return jsonify({
+                "success": False,
+                "error": "Password must be at least 10 characters long."
+            }), 400
+
+        salt, pw_hash = hash_password(cleaned_password)
 
         with db:
             db.execute("""
@@ -270,10 +284,10 @@ def create_app(config_class=Config):
         user = cur.fetchone()
 
         if not user:
-            # Re-seed if demo accounts were cleared
-            seed_safe_demo_data(db)
-            cur = db.execute("SELECT staff_id, name, designation, contact, login_username FROM staff WHERE login_username = ?", (target_username,))
-            user = cur.fetchone()
+            return jsonify({
+                "success": False,
+                "error": "Demo receptionist account is unavailable. Please log in with valid credentials."
+            }), 404
 
         user = dict(user)
         session['user_id'] = user['staff_id']
